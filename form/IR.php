@@ -68,8 +68,8 @@
 			$doc_locations = $this->corpus_terms[$term];
 			$num_locations = count($doc_locations);
 			$docs_with_term = array();
-			for($doc_location=0; $doc_location < $num_locations; $doc_location++)
-			$docs_with_term[$doc_location]++;
+			for($doc_location = 0; $doc_location < $num_locations; $doc_location++)
+				$docs_with_term[$doc_location]++;
 			return count($docs_with_term);
 		}
 

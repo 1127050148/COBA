@@ -3,7 +3,7 @@
 	include "IR.php";
 	// document yang sebagai percobaan
 	$D[0] = "Membuka blog khozaimi asyik";
-	$D[1] = "Selain asyik blog khozaimi juga banyak yang bisa diperoleh";
+	$D[1] = "Selain asyik blog khozaimi juga banyak yang bisa diperoleh blog";
 	$D[2] = "ayuk kita kunjungi blogna khozaimi biar asyik";
 
 	$ir = new IR;
