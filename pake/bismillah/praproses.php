@@ -80,35 +80,86 @@
 		}
 
 		public function hitungBobot(){
-			// hitung jumlah dokumen
-			$sqlJumDoc = mysql_query("SELECT DISTINCT id_doc from tbindex");
-			$jumDoc = mysql_num_rows($sqlJumDoc);
+			//hitung doc data latih
+			$sqlJumLatih = mysql_query("SELECT DISTINCT id_doc FROM tbindex");
+			$numRowLatih = mysql_num_rows($sqlJumLatih);
 
-			// ambil setiap record dalam tabel tbindex
-			// hitung bobot untuk setiap Term dalam setiap DocId
-			$sqlJumTerm = mysql_query("SELECT * FROM tbindex ORDER BY id_index");
-			$jumTerm = mysql_num_rows($sqlJumTerm);
-			while ($rowBobot = mysql_fetch_array($sqlJumTerm)) {
-				$term = $rowBobot['term'];
-				$tf = $rowBobot['jumlah'];
-				$id = $rowBobot['id_index'];
+			// hitung doc data uji
+			$sqljumBaru = mysql_query("SELECT DISTINCT id_doc FROM tbindex_baru");
+			$numRowBaru = mysql_num_rows($sqljumBaru);
 
-				// jumlah dokumen dengan term tertentu
-				$sqlTermInDoc = mysql_query("SELECT COUNT(*) as jumDoc from tbindex where term = '".$term."'");
-				$rowTerm = mysql_fetch_array($sqlTermInDoc);
-				$nTerm = $rowTerm['jumDoc'];
+			// jumlah dokumen update
+			$n = $numRowLatih+$numRowBaru; echo $n;
 
-				$w = $tf * (log10($jumDoc / $nTerm));
 
-				// update bobot term di tabel tbindex
-				$updateTbIndex = mysql_query("UPDATE tbindex SET bobot = '".$w."' WHERE id_index = '".$id."'");
-			}
+			$resVektor = mysql_query("SELECT tbindex_baru.term AS termBaru, tbindex_baru.jumlah AS jumBaru, tbindex_baru.id_doc AS idBaru, tbindex_baru.bobot AS bobotBaru, 
+							tbindex.term AS termLatih, tbindex.jumlah AS jumLatih, tbindex.id_doc AS idLatih, tbindex.bobot AS bobotLatih FROM tbindex_baru 
+							RIGHT JOIN tbindex on tbindex_baru.term =  tbindex.term ORDER BY tbindex_baru.term DESC");
+
+			while ($row = mysql_fetch_array($resVektor)) {
+				$termBaru = $row['termBaru'];
+				$jumBaru = $row['jumBaru'];
+				$idBaru = $row['idBaru'];
+				$bobotBaru = $row['bobotBaru'];
+				$termLatih = $row['termLatih'];
+				$jumLatih = $row['jumLatih'];
+				$idLatih = $row['idLatih'];
+				$bobotLatih = $row['bobotLatih'];
+
+				$idfBaru = mysql_query("SELECT COUNT(*) AS jum FROM tbindex_baru WHERE term = '".$termBaru."'");
+				while ($rowJumBaru = mysql_fetch_array($idfBaru)) {
+					$dfBaru = $rowJumBaru['jum'];
+				}
+
+				$idfLatih = mysql_query("SELECT COUNT(*) AS jum FROM tbindex WHERE term = '".$termLatih."'");
+				while ($rowJumLatih = mysql_fetch_array($idfLatih)) {
+					$dfLatih = $rowJumLatih['jum'];
+				}
+				// update nilai df
+				$dfUpdate = $dfBaru + $dfLatih; // echo $termLatih." : ".$dfUpdate."<br>";
+
+
+				if ($termBaru == $termLatih) {	
+					// update bobot termBaru
+					$sqlUpdateBaru = mysql_query("SELECT bobot FROM update_bobotuji WHERE term = '".$termBaru."' AND id_doc = '".$idBaru."'");
+					$jumRowBaru = mysql_num_rows($sqlUpdateBaru);
+					$wUpdate = $jumBaru * log10($n / $dfUpdate);
+					if ($jumRowBaru > 0) {
+						mysql_query("UPDATE update_bobotuji SET bobot = '".$wUpdate."' WHERE term = '".$termBaru."' AND id_doc = '".$idBaru."'");
+					}
+					else {
+						mysql_query("INSERT INTO update_bobotuji VALUES ('".$termBaru."', '".$idBaru."' , '".$wUpdate."', '', '')");
+					}
+
+					// update bobot termLatih
+					$sqlUpdateLatih = mysql_query("SELECT bobot FROM update_bobotlatih WHERE term = '".$termLatih."' AND id_doc = '".$idLatih."'");
+					$jumRowLatih = mysql_num_rows($sqlUpdateLatih);
+					$wUpdateLatih = $jumLatih * log10($n / $dfUpdate);
+					if ($jumRowLatih > 0) {
+						mysql_query("UPDATE update_bobotlatih SET bobot = '".$wUpdateLatih."' WHERE term = '".$termLatih."' AND id_doc = '".$idLatih."'");
+					}
+					else {
+						mysql_query("INSERT INTO update_bobotlatih VALUES ('".$termLatih."', '".$idLatih."' , '".$wUpdateLatih."', '', '')");
+					}
+				}
+				elseif ($termBaru == NULL) {
+					// update bobot termLatih
+					$sqlUpdateLatih = mysql_query("SELECT bobot FROM update_bobotlatih WHERE term = '".$termLatih."' AND id_doc = '".$idLatih."'");
+					$jumRowLatih = mysql_num_rows($sqlUpdateLatih);
+					$w = $jumLatih * log10($n / $dfLatih);
+					if ($jumRowLatih > 0) {
+						mysql_query("UPDATE update_bobotlatih SET bobot = '".$w."' WHERE term = '".$termLatih."' AND id_doc = '".$idLatih."'");
+					}
+					else {
+						mysql_query("INSERT INTO update_bobotlatih VALUES ('".$termLatih."', '".$idLatih."' , '".$w."', '', '')");
+					}
+				}
 		}
 	}
 
 	$ir = new Praproses();
 	$stem = new Stem();
-	$select = mysql_query("SELECT * from berita_training WHERE id_berita_training=24");
+	$select = mysql_query("SELECT * from berita_training");
 	while ($data = mysql_fetch_array($select)) {
 		$text = $data['isi_berita'];
 		$id = $data['id_berita_training'];
@@ -124,7 +175,6 @@
 					$pecah[$keyFilter] = $valFilter;
 					// echo $pecah[$keyFilter]."<br>";
 					$hasil_stem = $stem->stemming($pecah[$keyFilter]);
-
 					// echo $hasil_stem."<br>";
 
 					//CALL nama_prosedur(parameter);

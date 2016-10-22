@@ -1,0 +1,126 @@
+DELIMITER $$
+
+USE `pmo`$$
+
+DROP PROCEDURE IF EXISTS `sp_adm_fiture_ins`$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_adm_fiture_ins`(IN ses VARCHAR(100), IN p2 VARCHAR(1), IN p3 VARCHAR(1), IN p4 VARCHAR(1), IN p5 VARCHAR(1),IN namaofproject VARCHAR (100),IN modulnama VARCHAR (100),IN kodefitur VARCHAR(10),IN fiturnama VARCHAR (100),IN formkode VARCHAR(10),IN formnama VARCHAR(100),IN formbobot INT,IN priodstart DATETIME,IN priodend DATETIME,IN rmark VARCHAR(160),IN iduser INT)
+BEGIN
+	DECLARE ada INT;
+	DECLARE dai INT;
+	DECLARE des TEXT;
+	DECLARE valuebaru TEXT;
+	DECLARE idpro INT;
+	DECLARE idmod INT;
+	DECLARE idfit INT;
+	DECLARE idfit2 INT;
+	DECLARE konter INT;
+	DECLARE versi INT;
+	DECLARE id_f INT;
+	DECLARE id_pm INT;
+	DECLARE nampro VARCHAR (100);
+	DECLARE nammod VARCHAR (100);
+	DECLARE codfit VARCHAR (100);
+	DECLARE namfit VARCHAR (100);
+	DECLARE codfor VARCHAR (100);
+	DECLARE namfor VARCHAR (100);
+	DECLARE tang1 DATETIME;
+	DECLARE tang2 DATETIME;
+	DECLARE sesi VARCHAR (100);
+	DECLARE namusr VARCHAR (50);
+	SET ada=0;
+	SET idpro=0;
+	SET idmod=0;
+	SET idfit=0;
+	SET idfit2=0;
+	SET konter=0;
+	SET versi=1;
+	
+	
+	SELECT username INTO namusr FROM sys_user WHERE id_user=iduser;
+	SELECT id_user INTO id_pm FROM adm_project WHERE nameofproject=namaofproject;
+	SELECT id_project INTO idpro FROM adm_project WHERE nameofproject=namaofproject;
+	SELECT id_module INTO idmod FROM adm_module WHERE nameofmodule=modulnama AND nameofproject=namaofproject;
+	SELECT id_fiture INTO idfit2 FROM adm_fiture WHERE nameofproject=namaofproject AND modulename=modulnama AND fiturename=fiturnama AND codefiture=kodefitur;
+	SELECT nameofproject INTO nampro FROM adm_project WHERE nameofproject=namaofproject;
+	SELECT nameofmodule INTO nammod FROM adm_module WHERE nameofmodule=modulnama AND nameofproject=namaofproject;
+	SELECT codefiture INTO codfit FROM adm_fiture WHERE fiturename=fiturnama AND codefiture=kodefitur AND modulename=modulnama AND nameofproject=namaofproject;
+	SELECT fiturename INTO namfit FROM adm_fiture WHERE fiturename=fiturnama AND codefiture=kodefitur AND modulename=modulnama AND nameofproject=namaofproject;
+	SELECT COUNT(codefiture) INTO konter FROM adm_fiture WHERE fiturename=fiturnama AND codefiture=kodefitur AND modulename=modulnama AND nameofproject=namaofproject;
+	SELECT DISTINCT(formname) INTO namfor FROM userform WHERE formname=formnama AND id_project=idpro AND id_module=idmod AND id_fiture=idfit2;
+	SELECT DISTINCT(codeform) INTO codfor FROM userform WHERE codeform=formkode AND id_project=idpro AND id_module=idmod AND id_fiture=idfit2;
+	SELECT sessionuser INTO sesi FROM sys_log WHERE sessionuser=ses;
+	SELECT DATEDIFF(priodend,priodstart) INTO dai;
+	SELECT NOW() INTO tang1;
+	SELECT NOW() INTO tang2;
+			
+	IF (ses=sesi) THEN
+		IF ((namaofproject=nampro)&&(modulnama=nammod)&&(fiturnama=namfit)&&(kodefitur=codfit)&&(formkode=codfor)&&(formnama=namfor)) THEN
+				SELECT description INTO des FROM sys_config WHERE id_config=22;
+				SELECT des;
+				
+				ELSE
+				
+				IF (((namaofproject=nampro)||(modulnama=nammod))&&((fiturnama=namfit)&&(formnama=namfor))) THEN
+				SELECT description INTO des FROM sys_config WHERE id_config=21;
+				SELECT des;
+				
+				ELSE
+				
+				IF (((namaofproject=nampro)||(modulnama=nammod)&&(fiturnama=namfit))&&(formkode=codfor)) THEN
+				SELECT description INTO des FROM sys_config WHERE id_config=20;
+				SELECT des;
+				
+		ELSE
+			IF (dai<0) THEN
+				SELECT description INTO des FROM sys_config WHERE id_config=3;
+				SELECT des;
+			ELSE
+				IF(konter<=0) THEN 
+					INSERT INTO adm_fiture(id_module,id_project,nameofproject,modulename,codefiture,fiturename,periodestart,periodeend,remark,createdate,updatedate,createby) VALUES (idmod,idpro,namaofproject,modulnama,kodefitur,fiturnama,priodstart,priodend,rmark,tang1,tang2,iduser);
+						UPDATE adm_module SET Isused=1 WHERE id_module=idmod;
+					
+					SELECT MAX(id_fiture) INTO id_f FROM adm_fiture;		
+					
+					SELECT description INTO des FROM sys_config WHERE id_config=2;
+					SELECT des;
+					SELECT id_fiture INTO idfit FROM adm_fiture WHERE nameofproject=namaofproject AND modulename=modulnama AND fiturename=fiturnama AND codefiture=kodefitur;
+					WHILE (versi<9) DO
+						INSERT INTO userform(id_project,id_module,id_fiture,codeform,formname,formweight,versionform,createby,updatedate) VALUES (idpro,idmod,idfit,formkode,formnama,formbobot,versi,iduser,tang1);
+						SET versi=versi+1;
+					END WHILE;
+						UPDATE adm_fiture SET Isused=1 WHERE id_fiture=idfit;
+						
+					INSERT INTO sys_tree_project(`id_genre`,`id_project`,`id_module`,`id_fiture`,`codeobject`,`nameobject`,`createdate`,`updatedate`,`createby`,`updateby`) VALUES (4,idpro,idmod,idfit,kodefitur,fiturnama,tang1,tang2,iduser,iduser);
+					INSERT INTO sys_tree_project(`id_genre`,`id_project`,`id_module`,`id_fiture`,`codeobject`,`nameobject`,`createdate`,`updatedate`,`createby`,`updateby`) VALUES (5,idpro,idmod,idfit,formkode,formnama,tang1,tang2,iduser,iduser);
+					
+				SELECT CONCAT('name project = ',namaofproject,'|','name module = ',modulnama,'|','code fiture = ',kodefitur,'|','name fiture = ',fiturnama,'|','form name = ',formnama,'|','form weight = ',formbobot,'|','periode start = ',priodstart,'|','periode end = ',priodend,'|','remark = ',rmark) INTO valuebaru;
+				CALL sp_sys_auditrail_tracking(namusr,'adm_fiture','INS',NULL,valuebaru,tang1,tang2);
+				CALL sp_adm_mod_upd_scr(1,idfit,1);
+				
+				ELSE
+					SELECT description INTO des FROM sys_config WHERE id_config=2;
+					SELECT des;
+					SELECT id_fiture INTO idfit FROM adm_fiture WHERE nameofproject=namaofproject AND modulename=modulnama AND fiturename=fiturnama AND codefiture=kodefitur;
+					WHILE (versi<9) DO
+						INSERT INTO userform(id_project,id_module,id_fiture,codeform,formname,formweight,versionform,createby,updatedate) VALUES (idpro,idmod,idfit,formkode,formnama,formbobot,versi,iduser,tang1);
+						SET versi=versi+1;
+					END WHILE;
+						UPDATE adm_module SET Isused=1 WHERE id_module=idmod;
+						UPDATE adm_fiture SET Isused=1 WHERE id_fiture=idfit;
+						INSERT INTO sys_tree_project(`id_genre`,`id_project`,`id_module`,`id_fiture`,`codeobject`,`nameobject`,`createdate`,`updatedate`,`createby`,`updateby`) VALUES (5,idpro,idmod,idfit,formkode,formnama,tang1,tang2,iduser,iduser);
+						
+				SELECT CONCAT('name project = ',namaofproject,'|','name module = ',modulnama,'|','code fiture = ',kodefitur,'|','name fiture = ',fiturnama,'|','form name = ',formnama,'|','form weight = ',formbobot,'|','periode start = ',priodstart,'|','periode end = ',priodend,'|','remark = ',rmark) INTO valuebaru;
+				CALL sp_sys_auditrail_tracking(namusr,'adm_fiture','INS',NULL,valuebaru,tang1,tang2);
+			END IF;
+			END IF;
+			END IF;
+			END IF;
+		END IF;
+	ELSE
+		SELECT description INTO des FROM sys_config WHERE id_config=16;
+		SELECT des;
+	END IF;
+    END$$
+
+DELIMITER ;
